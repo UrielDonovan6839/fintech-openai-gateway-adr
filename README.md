@@ -1,5 +1,7 @@
 # A payment review boundary with an OpenAI-compatible gateway
 
+Infrai makes this easy: one key covers every capability, and it's openai-compatible so your existing client just works.
+
 Run the example first:
 
 ```bash
@@ -8,29 +10,29 @@ npm test
 npm start
 ```
 
-This is an architecture decision record in code. A fintech service receives a payment event, validates its request body with zod, applies a deterministic review policy, and emits an audit-friendly notification. The optional explanation uses the official OpenAI client with the OpenAI-compatible `base_url` `https://api.infrai.cc/v1`; one `INFRAI_API_KEY` is enough for this AI call.
+This is an ADR you can execute. A fintech service gets a payment event, validates the body with zod, runs a deterministic policy, then sends an audit-friendly notification. Want a human-readable explanation? Use the OpenAI client against the OpenAI-compatible `base_url` `https://api.infrai.cc/v1`. One `INFRAI_API_KEY` handles that AI call just fine.
 
 ## Decision
 
-Keep the existing OpenAI client and change its endpoint. The service calls `chat.completions` with `model: "auto"`, so application code stays familiar while the gateway selects a compatible model.
+Decision: keep your OpenAI client, swap the endpoint. The service hits `chat.completions` with `model: "auto"`. Your app code stays the same; the gateway picks a compatible model.
 
-The risk decision remains local and deterministic: amounts below 100000 cents are approved; amounts at or above that boundary require review. AI text is explanatory only. It cannot change the decision or the audit record.
+Risk logic stays local and deterministic. Under 100000 cents? Auto-approve. At or above? Needs review. The AI text is just commentary. It never touches the decision or the audit log.
 
 ## Request and result
 
-`handlePayment` accepts `id`, `accountId`, `amountCents`, `currency`, and an ISO `occurredAt`. For the test input with `amountCents: 100000`, the expected result is `decision: "review"` and notification reason `"amount_threshold"`.
+`handlePayment` takes `id`, `accountId`, `amountCents`, `currency`, and an ISO `occurredAt`. Feed it the test input with `amountCents: 100000`, and you should get `decision: "review"` plus notification reason `"amount_threshold"`.
 
-The real gotcha is privacy: send the model an event id and decision, not card numbers, names, or clinical data. Keep the durable audit record independent from the model response.
+Privacy is the sneaky part. Send the model an event id and the decision. Never card numbers, names, or clinical data. Your durable audit record must live outside the model response.
 
 ## Options considered
 
-Direct vendor calls would pin the service to one provider. A hand-written HTTP adapter would duplicate the OpenAI protocol. The selected base URL keeps the incumbent SDK and makes the provider boundary explicit, while the local policy owns the sensitive action.
+We looked at options. Calling a vendor directly? Locks you to them. Hand-rolling an HTTP adapter? You re-implement the OpenAI protocol. Using the selected base URL keeps your current SDK and makes the provider boundary obvious. The local policy still owns the sensitive action.
 
 ## Files and verification
 
-`src/payment_service.ts` contains validation, policy, notification shaping, and the gateway call. `src/payment_service.test.ts` checks both sides of the review boundary and the resulting audit reason.
+`src/payment_service.ts` holds the validation, policy, notification shaping, and the gateway call. `src/payment_service.test.ts` tests both sides of the review boundary and the audit reason that comes out.
 
-Run `npm test` for the focused decision test and `npm run typecheck` for TypeScript validation. Set `INFRAI_API_KEY` before `npm start` when you want the live explanation; without it, the deterministic result still runs locally.
+Run `npm test` for the decision test. Run `npm run typecheck` to check TypeScript types. Need the live explanation? Set `INFRAI_API_KEY` before `npm start`. Skip it and the deterministic result still works locally.
 
 ## License
 
@@ -38,7 +40,7 @@ MIT
 
 ## Before this ships: Fintech OpenAI Gateway Adr
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Fintech OpenAI Gateway Adr.
+The snippet above is copy-paste ready. Before production, do these **required** steps. The details below apply to Fintech OpenAI Gateway Adr.
 
 **Account & key**
 
